@@ -1,27 +1,30 @@
 //@version=6
-indicator("Volentis Structure Chain v19 - Basit Yön Tablosu", overlay=true, max_labels_count=500, max_lines_count=500)
+indicator("Volentis Structure Chain v9", overlay=true, max_labels_count=500, max_lines_count=500)
+
 //====================================================
 // INPUTS
 //====================================================
-autoTF         = input.bool(true,  "Otomatik TF Ayarı (Swing Length)")
-swingLen       = input.int(10,     "Swing Length (Manuel)", minval=1)
-showRawPivots  = input.bool(true,  "PH / PL Göster")
-showRefLines   = input.bool(true,  "Referans Çizgileri")
-showStruct     = input.bool(true,  "Structure Göster")
-showLHLabels   = input.bool(true,  "LH / HL Etiketleri Göster")
-showBOSLines   = input.bool(true,  "BOS Çizgilerini Göster")
-showCHOCHLines = input.bool(true,  "CHOCH Çizgilerini Göster")
-showTable      = input.bool(true,  "MTF Tablo Göster")
+autoTF        = input.bool(true,  "Otomatik TF Ayarı (Swing Length)")
+swingLen      = input.int(10,     "Swing Length (Manuel)", minval=1)
+showRawPivots = input.bool(true,  "PH / PL Göster")
+showRefLines  = input.bool(true,  "Referans Çizgileri")
+showStruct    = input.bool(true,  "Structure Göster")
+showLHLabels  = input.bool(true,  "LH / HL Etiketleri Göster")
+showBOSLines  = input.bool(true,  "BOS Çizgilerini Göster")
+showCHOCHLines= input.bool(true,  "CHOCH Çizgilerini Göster")
+
 top1Col    = input.color(color.red,    "TOP1")
 top2Col    = input.color(color.orange, "TOP2")
 bot1Col    = input.color(color.green,  "BOT1")
 bot2Col    = input.color(color.teal,   "BOT2")
 top12Col   = input.color(color.yellow, "TOP_12")
 bot12Col   = input.color(color.lime,   "BOT_12")
+
 bosUpCol   = input.color(color.green,   "BOS UP")
 bosDnCol   = input.color(color.red,     "BOS DOWN")
 chochUpCol = input.color(color.aqua,    "CHOCH UP")
 chochDnCol = input.color(color.fuchsia, "CHOCH DOWN")
+
 hhCol = input.color(color.new(color.green,  0), "HH")
 hlCol = input.color(color.new(color.green, 35), "HL")
 llCol = input.color(color.new(color.red,    0), "LL")
@@ -41,9 +44,9 @@ if autoTF
         "60"  => 10
         "120" => 8
         "240" => 7
-        "1D"  => 5
-        "1W"  => 3
-        "1M"  => 2
+        "D"   => 5
+        "W"   => 3
+        "M"   => 2
         =>       10
 
 int MAX_CHAIN = 500
@@ -73,12 +76,10 @@ if not na(ph)
     array.push(pivotHighVals,  ph)
     array.push(pivotHighTimes, int(time[tf_swingLen]))
     array.push(pivotHighBars,  bar_index - tf_swingLen)
-
 if not na(pl)
     array.push(pivotLowVals,   pl)
     array.push(pivotLowTimes,  int(time[tf_swingLen]))
     array.push(pivotLowBars,   bar_index - tf_swingLen)
-
 array.push(allCloses,     close)
 array.push(allCloseBars,  bar_index)
 array.push(allCloseTimes, int(time))
@@ -86,7 +87,8 @@ array.push(allCloseTimes, int(time))
 //====================================================
 // HELPERS
 //====================================================
-f_mid_time(int t1, int t2) => int(math.floor((t1 + t2) * 0.5))
+f_mid_time(int t1, int t2) =>
+    int(math.floor((t1 + t2) * 0.5))
 
 f_clear_all() =>
     if array.size(drawnLabels) > 0
@@ -267,37 +269,54 @@ f_is_higher_low(int idx) =>
     result
 
 //====================================================
-// MTF YÖN FONKSİYONU - DAHA GÜÇLÜ VERSİYON
+// MTF - HER TF İÇİN CHOCH (HL=SHORT, LH=LONG)
 //====================================================
-f_get_tf_dir(string tf) =>
-    int piv = tf == "1M" ? 2 : tf == "1W" ? 3 : tf == "1D" ? 5 : tf == "240" ? 7 : tf == "60" ? 10 : tf == "30" ? 15 : tf == "15" ? 20 : tf == "5" ? 30 : 50
-    [ph_tf, pl_tf, cls_tf] = request.security(syminfo.tickerid, tf,
-     [ta.pivothigh(high, piv, piv), ta.pivotlow(low, piv, piv), close],
-     gaps=barmerge.gaps_off, lookahead=barmerge.lookahead_off)
+f_get_choch(string tf, int piv_len) =>
+    float ph_tf = request.security(syminfo.tickerid, tf, ta.pivothigh(high, piv_len, piv_len), lookahead=barmerge.lookahead_off)
+    float pl_tf = request.security(syminfo.tickerid, tf, ta.pivotlow(low, piv_len, piv_len), lookahead=barmerge.lookahead_off)
+    float cls   = request.security(syminfo.tickerid, tf, close, lookahead=barmerge.lookahead_off)
     
-    int dir = 0
-    // Bullish yön (Lower High kırılımı + close üstü)
+    float ph0 = na
+    float ph1 = na
+    int ph0Bar = na
+    int ph1Bar = na
     if not na(ph_tf)
-        float prev_ph = ta.valuewhen(not na(ph_tf), ph_tf, 1)
-        if not na(prev_ph) and ph_tf < prev_ph and not na(cls_tf) and cls_tf > prev_ph
-            dir := 1
-    // Bearish yön (Higher Low kırılımı + close altı)
+        ph0 := ph_tf
+        ph0Bar := bar_index
+        ph1 := ta.valuewhen(not na(ph_tf), ph_tf, 1)
+        ph1Bar := ta.valuewhen(not na(ph_tf), bar_index, 1)
+    
+    float pl0 = na
+    float pl1 = na
+    int pl0Bar = na
+    int pl1Bar = na
     if not na(pl_tf)
-        float prev_pl = ta.valuewhen(not na(pl_tf), pl_tf, 1)
-        if not na(prev_pl) and pl_tf > prev_pl and not na(cls_tf) and cls_tf < prev_pl
-            dir := -1
-    dir
+        pl0 := pl_tf
+        pl0Bar := bar_index
+        pl1 := ta.valuewhen(not na(pl_tf), pl_tf, 1)
+        pl1Bar := ta.valuewhen(not na(pl_tf), bar_index, 1)
+    
+    int bias = 0
+    
+    bool isLH = not na(pl1Bar) and not na(ph0Bar) and pl1Bar < ph0Bar and ph0 < ph1
+    bool isHL = not na(ph1Bar) and not na(pl0Bar) and ph1Bar < pl0Bar and pl0 > pl1
+    
+    if isLH and cls > ph0
+        bias := 1
+    if isHL and cls < pl0
+        bias := -1
+    
+    bias
 
-// Yön değişkenleri (Global scope'ta tanımlı)
-chochM  = f_get_tf_dir("1M")
-chochW  = f_get_tf_dir("1W")
-chochD  = f_get_tf_dir("1D")
-choch4H = f_get_tf_dir("240")
-choch1H = f_get_tf_dir("60")
-choch30 = f_get_tf_dir("30")
-choch15 = f_get_tf_dir("15")
-choch5  = f_get_tf_dir("5")
-choch1  = f_get_tf_dir("1")
+dirM  = f_get_choch("M",   2)
+dirW  = f_get_choch("W",   3)
+dirD  = f_get_choch("D",   5)
+dir4H = f_get_choch("240", 7)
+dir1H = f_get_choch("60",  10)
+dir30 = f_get_choch("30",  15)
+dir15 = f_get_choch("15",  20)
+dir5  = f_get_choch("5",   30)
+dir1  = f_get_choch("1",   50)
 
 //====================================================
 // MAIN
@@ -307,10 +326,10 @@ var table dirTable = table.new(position.top_right, 2, 10, border_width=1, border
 
 if barstate.islast
     f_clear_all()
-    
+
     int topCount = array.size(pivotHighVals)
     int botCount = array.size(pivotLowVals)
-    
+
     if showLHLabels
         for i = 1 to topCount - 1
             if f_is_lower_high(i)
@@ -323,8 +342,6 @@ if barstate.islast
     float top2Val = na
     float bot1Val = na
     float bot2Val = na
-    float bot12Val = na
-    float top12Val = na
     int top1Idx = -1
     int top2Idx = -1
     int bot1Idx = -1
@@ -333,14 +350,10 @@ if barstate.islast
     int top2Time = na
     int bot1Time = na
     int bot2Time = na
-    int bot12Time = na
-    int top12Time = na
     int top1Bar = na
     int top2Bar = na
     int bot1Bar = na
     int bot2Bar = na
-    int bot12Bar = na
-    int top12Bar = na
 
     if topCount > 0
         float best = -1e10
@@ -352,17 +365,16 @@ if barstate.islast
                 top1Idx := i
                 top1Time := array.get(pivotHighTimes, i)
                 top1Bar := array.get(pivotHighBars, i)
-        
-        if top1Idx > 0
-            float best = -1e10
-            for i = 0 to top1Idx - 1
-                float v = array.get(pivotHighVals, i)
-                if v > best
-                    best := v
-                    top2Val := v
-                    top2Idx := i
-                    top2Time := array.get(pivotHighTimes, i)
-                    top2Bar := array.get(pivotHighBars, i)
+    if top1Idx > 0
+        float best = -1e10
+        for i = 0 to top1Idx - 1
+            float v = array.get(pivotHighVals, i)
+            if v > best
+                best := v
+                top2Val := v
+                top2Idx := i
+                top2Time := array.get(pivotHighTimes, i)
+                top2Bar := array.get(pivotHighBars, i)
 
     if botCount > 0
         float best = 1e10
@@ -374,18 +386,20 @@ if barstate.islast
                 bot1Idx := i
                 bot1Time := array.get(pivotLowTimes, i)
                 bot1Bar := array.get(pivotLowBars, i)
-        
-        if bot1Idx > 0
-            float best = 1e10
-            for i = 0 to bot1Idx - 1
-                float v = array.get(pivotLowVals, i)
-                if v < best
-                    best := v
-                    bot2Val := v
-                    bot2Idx := i
-                    bot2Time := array.get(pivotLowTimes, i)
-                    bot2Bar := array.get(pivotLowBars, i)
+    if bot1Idx > 0
+        float best = 1e10
+        for i = 0 to bot1Idx - 1
+            float v = array.get(pivotLowVals, i)
+            if v < best
+                best := v
+                bot2Val := v
+                bot2Idx := i
+                bot2Time := array.get(pivotLowTimes, i)
+                bot2Bar := array.get(pivotLowBars, i)
 
+    float bot12Val = na
+    int bot12Time = na
+    int bot12Bar = na
     if not na(top2Bar) and not na(top1Bar)
         for i = 0 to botCount - 1
             int b = array.get(pivotLowBars, i)
@@ -396,6 +410,9 @@ if barstate.islast
                     bot12Time := array.get(pivotLowTimes, i)
                     bot12Bar := b
 
+    float top12Val = na
+    int top12Time = na
+    int top12Bar = na
     if not na(bot2Bar) and not na(bot1Bar)
         for i = 0 to topCount - 1
             int b = array.get(pivotHighBars, i)
@@ -429,7 +446,7 @@ if barstate.islast
         if showRefLines
             f_hline(bot2Time, bot2Val, bot2Col, line.style_dotted)
     if not na(bot12Val)
-        f_label(bot12Time, bot12Val, "BOT_12", label.style_label_up, bot12Col, color.black, size.small)
+        f_label(bot12Time, bot12Val, "BOT_12", label.style_label_up,   bot12Col, color.black, size.small)
     if not na(top12Val)
         f_label(top12Time, top12Val, "TOP_12", label.style_label_down, top12Col, color.black, size.small)
 
@@ -448,10 +465,10 @@ if barstate.islast
         int activeHLTime = na
         int activeLLTime = na
         int activeLHTime = na
-        
+
         bool canBull = not na(top2Bar) and not na(bot12Bar)
         bool canBear = not na(bot2Bar) and not na(top12Bar)
-        
+
         if canBull and canBear
             if top2Bar <= bot2Bar
                 state := 1
@@ -489,24 +506,26 @@ if barstate.islast
             activeLH := top12Val
             activeLHBar := top12Bar
             activeLHTime := top12Time
-            
+
         currentState := state
-        
+
         if state == 1
             f_label(activeHHTime, activeHH, "HH", label.style_label_down, hhCol, color.white, size.tiny)
-            f_label(activeHLTime, activeHL, "HL", label.style_label_up, hlCol, color.white, size.tiny)
+            f_label(activeHLTime, activeHL, "HL", label.style_label_up,   hlCol, color.white, size.tiny)
         else if state == -1
-            f_label(activeLLTime, activeLL, "LL", label.style_label_up, llCol, color.white, size.tiny)
+            f_label(activeLLTime, activeLL, "LL", label.style_label_up,   llCol, color.white, size.tiny)
             f_label(activeLHTime, activeLH, "LH", label.style_label_down, lhCol, color.white, size.tiny)
 
         for step = 0 to MAX_CHAIN - 1
             if state == 1 and not na(activeHHBar) and not na(activeHLBar)
                 [nextTopVal, nextTopBar, nextTopTime] = f_next_high_after(cursorBar)
                 [nextBotVal, nextBotBar, nextBotTime] = f_next_low_after(cursorBar)
+
                 bool hasTop = not na(nextTopBar)
                 bool hasBot = not na(nextBotBar)
                 if not hasTop and not hasBot
                     break
+
                 if hasTop and (not hasBot or nextTopBar < nextBotBar)
                     if nextTopVal > activeHH
                         [confBar, confTime] = f_first_close_above(nextTopBar, activeHH)
@@ -548,7 +567,7 @@ if barstate.islast
                             line ln = line.new(activeHLTime, activeHL, nextBotTime, activeHL, xloc=xloc.bar_time, color=chochDnCol, width=2, style=line.style_dashed)
                             array.push(drawnLines, ln)
                             f_text(f_mid_time(activeHLTime, nextBotTime), activeHL, "CHOCH ↓", chochDnCol, size.small)
-                        f_label(nextBotTime, nextBotVal, "LL", label.style_label_up, llCol, color.white, size.tiny)
+                        f_label(nextBotTime, nextBotVal, "LL", label.style_label_up,   llCol, color.white, size.tiny)
                         f_label(newLHT, newLH, "LH", label.style_label_down, lhCol, color.white, size.tiny)
                         activeLL := nextBotVal
                         activeLLBar := nextBotBar
@@ -561,13 +580,16 @@ if barstate.islast
                         currentState := -1
                     else
                         cursorBar := nextBotBar
+
             else if state == -1 and not na(activeLLBar) and not na(activeLHBar)
                 [nextTopVal2, nextTopBar2, nextTopTime2] = f_next_high_after(cursorBar)
                 [nextBotVal2, nextBotBar2, nextBotTime2] = f_next_low_after(cursorBar)
+
                 bool hasTop2 = not na(nextTopBar2)
                 bool hasBot2 = not na(nextBotBar2)
                 if not hasTop2 and not hasBot2
                     break
+
                 if hasBot2 and (not hasTop2 or nextBotBar2 < nextTopBar2)
                     if nextBotVal2 < activeLL
                         [confBar2, confTime2] = f_first_close_below(nextBotBar2, activeLL)
@@ -583,7 +605,7 @@ if barstate.islast
                                 line ln = line.new(activeLLTime, activeLL, confTime2, activeLL, xloc=xloc.bar_time, color=bosDnCol, width=2, style=line.style_solid)
                                 array.push(drawnLines, ln)
                                 f_text(f_mid_time(activeLLTime, confTime2), activeLL, "BOS ↓", bosDnCol, size.small)
-                            f_label(nextBotTime2, nextBotVal2, "LL", label.style_label_up, llCol, color.white, size.tiny)
+                            f_label(nextBotTime2, nextBotVal2, "LL", label.style_label_up,   llCol, color.white, size.tiny)
                             f_label(newLHT, newLH, "LH", label.style_label_down, lhCol, color.white, size.tiny)
                             activeLL := nextBotVal2
                             activeLLBar := nextBotBar2
@@ -610,7 +632,7 @@ if barstate.islast
                             array.push(drawnLines, ln)
                             f_text(f_mid_time(activeLHTime, nextTopTime2), activeLH, "CHOCH ↑", chochUpCol, size.small)
                         f_label(nextTopTime2, nextTopVal2, "HH", label.style_label_down, hhCol, color.white, size.tiny)
-                        f_label(newHLT, newHL, "HL", label.style_label_up, hlCol, color.white, size.tiny)
+                        f_label(newHLT, newHL, "HL", label.style_label_up,   hlCol, color.white, size.tiny)
                         activeHH := nextTopVal2
                         activeHHBar := nextTopBar2
                         activeHHTime := nextTopTime2
@@ -625,50 +647,20 @@ if barstate.islast
             else
                 break
 
-//====================================================
-// MTF TABLO - HER TF KENDİ BIAS'INI GÖSTERİR (KESİN ÇÖZÜM)
-//====================================================
-if showTable
+    //====================================================
+    // TABLE
+    //====================================================
     table.delete(dirTable)
     dirTable := table.new(position.top_right, 2, 10, border_width=1, border_color=color.gray, frame_color=color.gray, frame_width=1)
-    
-    table.cell(dirTable, 0, 0, "TF",  text_color=color.gray, text_size=size.small, bgcolor=color.new(color.black, 50))
-    table.cell(dirTable, 1, 0, "YÖN", text_color=color.gray, text_size=size.small, bgcolor=color.new(color.black, 50))
-    
-    // Her TF için ayrı yön ve renk hesapla (Dosyanın üstünde hesaplanan choch* değişkenleri kullanılır)
-    // Artık currentState'a bağımlı değil, her TF kendi verisini çekiyor.
-    string dirM  = chochM  == 1 ? "▲ LONG" : chochM  == -1 ? "▼ SHORT" : "—"
-    color  colM  = chochM  == 1 ? color.lime : chochM  == -1 ? color.red : color.gray
-    
-    string dirW  = chochW  == 1 ? "▲ LONG" : chochW  == -1 ? "▼ SHORT" : "—"
-    color  colW  = chochW  == 1 ? color.lime : chochW  == -1 ? color.red : color.gray
-    
-    string dirD  = chochD  == 1 ? "▲ LONG" : chochD  == -1 ? "▼ SHORT" : "—"
-    color  colD  = chochD  == 1 ? color.lime : chochD  == -1 ? color.red : color.gray
-    
-    string dir4H = choch4H == 1 ? "▲ LONG" : choch4H == -1 ? "▼ SHORT" : "—"
-    color  col4H = choch4H == 1 ? color.lime : choch4H == -1 ? color.red : color.gray
-    
-    string dir1H = choch1H == 1 ? "▲ LONG" : choch1H == -1 ? "▼ SHORT" : "—"
-    color  col1H = choch1H == 1 ? color.lime : choch1H == -1 ? color.red : color.gray
-    
-    string dir30 = choch30 == 1 ? "▲ LONG" : choch30 == -1 ? "▼ SHORT" : "—"
-    color  col30 = choch30 == 1 ? color.lime : choch30 == -1 ? color.red : color.gray
-    
-    string dir15 = choch15 == 1 ? "▲ LONG" : choch15 == -1 ? "▼ SHORT" : "—"
-    color  col15 = choch15 == 1 ? color.lime : choch15 == -1 ? color.red : color.gray
-    
-    string dir5  = choch5  == 1 ? "▲ LONG" : choch5  == -1 ? "▼ SHORT" : "—"
-    color  col5  = choch5  == 1 ? color.lime : choch5  == -1 ? color.red : color.gray
-    
-    string dir1  = choch1  == 1 ? "▲ LONG" : choch1  == -1 ? "▼ SHORT" : "—"
-    color  col1  = choch1  == 1 ? color.lime : choch1  == -1 ? color.red : color.gray
-    
-    // Aktif TF arka plan rengi
+
     string cur = timeframe.period
-    color bgM  = cur == "1M"  ? color.new(color.blue, 45) : color.new(color.black, 75)
-    color bgW  = cur == "1W"  ? color.new(color.blue, 45) : color.new(color.black, 75)
-    color bgD  = cur == "1D"  ? color.new(color.blue, 45) : color.new(color.black, 75)
+    color hdr_bg = color.new(color.black, 50)
+    table.cell(dirTable, 0, 0, "TF",  text_color=color.gray, text_size=size.small, bgcolor=hdr_bg)
+    table.cell(dirTable, 1, 0, "YÖN", text_color=color.gray, text_size=size.small, bgcolor=hdr_bg)
+
+    color bgM  = cur == "M"   ? color.new(color.blue, 45) : color.new(color.black, 75)
+    color bgW  = cur == "W"   ? color.new(color.blue, 45) : color.new(color.black, 75)
+    color bgD  = cur == "D"   ? color.new(color.blue, 45) : color.new(color.black, 75)
     color bg4  = cur == "240" ? color.new(color.blue, 45) : color.new(color.black, 75)
     color bg1h = cur == "60"  ? color.new(color.blue, 45) : color.new(color.black, 75)
     color bg30 = cur == "30"  ? color.new(color.blue, 45) : color.new(color.black, 75)
@@ -676,22 +668,39 @@ if showTable
     color bg5  = cur == "5"   ? color.new(color.blue, 45) : color.new(color.black, 75)
     color bg1  = cur == "1"   ? color.new(color.blue, 45) : color.new(color.black, 75)
 
-    // Hücreleri doldur (Her satır kendi değişkenini kullanır)
-    table.cell(dirTable, 0, 1, "1M",  text_color=color.white, bgcolor=bgM)
-    table.cell(dirTable, 1, 1, dirM,  text_color=colM,  bgcolor=bgM)
-    table.cell(dirTable, 0, 2, "1W",  text_color=color.white, bgcolor=bgW)
-    table.cell(dirTable, 1, 2, dirW,  text_color=colW,  bgcolor=bgW)
-    table.cell(dirTable, 0, 3, "1D",  text_color=color.white, bgcolor=bgD)
-    table.cell(dirTable, 1, 3, dirD,  text_color=colD,  bgcolor=bgD)
-    table.cell(dirTable, 0, 4, "4H",  text_color=color.white, bgcolor=bg4)
-    table.cell(dirTable, 1, 4, dir4H, text_color=col4H, bgcolor=bg4)
-    table.cell(dirTable, 0, 5, "1H",  text_color=color.white, bgcolor=bg1h)
-    table.cell(dirTable, 1, 5, dir1H, text_color=col1H, bgcolor=bg1h)
-    table.cell(dirTable, 0, 6, "30M", text_color=color.white, bgcolor=bg30)
-    table.cell(dirTable, 1, 6, dir30, text_color=col30, bgcolor=bg30)
-    table.cell(dirTable, 0, 7, "15M", text_color=color.white, bgcolor=bg15)
-    table.cell(dirTable, 1, 7, dir15, text_color=col15, bgcolor=bg15)
-    table.cell(dirTable, 0, 8, "5M",  text_color=color.white, bgcolor=bg5)
-    table.cell(dirTable, 1, 8, dir5,  text_color=col5,  bgcolor=bg5)
-    table.cell(dirTable, 0, 9, "1M",  text_color=color.white, bgcolor=bg1)
-    table.cell(dirTable, 1, 9, dir1,  text_color=col1,  bgcolor=bg1)
+    string dirM_str  = dirM  == 1 ? "▲ LONG" : "▼ SHORT"
+    string dirW_str  = dirW  == 1 ? "▲ LONG" : "▼ SHORT"
+    string dirD_str  = dirD  == 1 ? "▲ LONG" : "▼ SHORT"
+    string dir4H_str = dir4H == 1 ? "▲ LONG" : "▼ SHORT"
+    string dir1H_str = dir1H == 1 ? "▲ LONG" : "▼ SHORT"
+    string dir30_str = dir30 == 1 ? "▲ LONG" : "▼ SHORT"
+    string dir15_str = dir15 == 1 ? "▲ LONG" : "▼ SHORT"
+    string dir5_str  = dir5  == 1 ? "▲ LONG" : "▼ SHORT"
+    string dir1_str  = dir1  == 1 ? "▲ LONG" : "▼ SHORT"
+
+    table.cell(dirTable, 0, 1, "MO",  text_color=color.white, text_size=size.small, bgcolor=bgM)
+    table.cell(dirTable, 1, 1, dirM_str,  text_color=dirM ==1?color.lime:color.red, text_size=size.small, bgcolor=bgM)
+
+    table.cell(dirTable, 0, 2, "W",   text_color=color.white, text_size=size.small, bgcolor=bgW)
+    table.cell(dirTable, 1, 2, dirW_str,  text_color=dirW ==1?color.lime:color.red, text_size=size.small, bgcolor=bgW)
+
+    table.cell(dirTable, 0, 3, "1D",  text_color=color.white, text_size=size.small, bgcolor=bgD)
+    table.cell(dirTable, 1, 3, dirD_str,  text_color=dirD ==1?color.lime:color.red, text_size=size.small, bgcolor=bgD)
+
+    table.cell(dirTable, 0, 4, "4H",  text_color=color.white, text_size=size.small, bgcolor=bg4)
+    table.cell(dirTable, 1, 4, dir4H_str, text_color=dir4H==1?color.lime:color.red, text_size=size.small, bgcolor=bg4)
+
+    table.cell(dirTable, 0, 5, "1H",  text_color=color.white, text_size=size.small, bgcolor=bg1h)
+    table.cell(dirTable, 1, 5, dir1H_str, text_color=dir1H==1?color.lime:color.red, text_size=size.small, bgcolor=bg1h)
+
+    table.cell(dirTable, 0, 6, "30M", text_color=color.white, text_size=size.small, bgcolor=bg30)
+    table.cell(dirTable, 1, 6, dir30_str, text_color=dir30==1?color.lime:color.red, text_size=size.small, bgcolor=bg30)
+
+    table.cell(dirTable, 0, 7, "15M", text_color=color.white, text_size=size.small, bgcolor=bg15)
+    table.cell(dirTable, 1, 7, dir15_str, text_color=dir15==1?color.lime:color.red, text_size=size.small, bgcolor=bg15)
+
+    table.cell(dirTable, 0, 8, "5M",  text_color=color.white, text_size=size.small, bgcolor=bg5)
+    table.cell(dirTable, 1, 8, dir5_str,  text_color=dir5 ==1?color.lime:color.red, text_size=size.small, bgcolor=bg5)
+
+    table.cell(dirTable, 0, 9, "1M",  text_color=color.white, text_size=size.small, bgcolor=bg1)
+    table.cell(dirTable, 1, 9, dir1_str,  text_color=dir1 ==1?color.lime:color.red, text_size=size.small, bgcolor=bg1)
