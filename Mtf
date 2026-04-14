@@ -626,7 +626,7 @@ if barstate.islast
                 break
 
 //====================================================
-// MTF TABLO - HER TF KENDİ BIAS'INI GÖSTERİR (KESİN ÇÖZÜM)
+// MTF TABLO - HER TF İÇİN AYRI BIAS DEĞERİ
 //====================================================
 if showTable
     table.delete(dirTable)
@@ -635,8 +635,7 @@ if showTable
     table.cell(dirTable, 0, 0, "TF",  text_color=color.gray, text_size=size.small, bgcolor=color.new(color.black, 50))
     table.cell(dirTable, 1, 0, "YÖN", text_color=color.gray, text_size=size.small, bgcolor=color.new(color.black, 50))
     
-    // Her TF için ayrı yön ve renk hesapla (Dosyanın üstünde hesaplanan choch* değişkenleri kullanılır)
-    // Artık currentState'a bağımlı değil, her TF kendi verisini çekiyor.
+    // Her timeframe için kendi bias değerini kullan
     string dirM  = chochM  == 1 ? "▲ LONG" : chochM  == -1 ? "▼ SHORT" : "—"
     color  colM  = chochM  == 1 ? color.lime : chochM  == -1 ? color.red : color.gray
     
@@ -693,5 +692,5 @@ if showTable
     table.cell(dirTable, 1, 7, dir15, text_color=col15, bgcolor=bg15)
     table.cell(dirTable, 0, 8, "5M",  text_color=color.white, bgcolor=bg5)
     table.cell(dirTable, 1, 8, dir5,  text_color=col5,  bgcolor=bg5)
-    table.cell(dirTable, 0, 9, "1M",  text_color=color.white, bgcolor=bg1)
+    table.cell(dirTable, 0, 9, "1",   text_color=color.white, bgcolor=bg1)
     table.cell(dirTable, 1, 9, dir1,  text_color=col1,  bgcolor=bg1)
